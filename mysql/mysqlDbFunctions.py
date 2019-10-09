@@ -20,7 +20,7 @@ import datetime
 import pipes
 
 
-def backup_mysql_db(host, port, userName, password, databaseName, folderPath):
+def backup_mysql_db(host, port, userName, password, databaseName, folderPath, compress = True):
     
     # generate a backup name with a timestamp
     timestamp = time.strftime('%Y%m%d-%H%M%S')
@@ -51,9 +51,20 @@ def backup_mysql_db(host, port, userName, password, databaseName, folderPath):
             
             print("Executing " + dumpcmd)
 
-            os.system(dumpcmd)
-            gzipcmd = "gzip " + pipes.quote(path)
-            os.system(gzipcmd)
+            response = os.system(dumpcmd)
+
+            if response==0:
+                # zip the file
+                if compress:
+                    gzipcmd = "gzip " + pipes.quote(path)
+                    path = path + ".gz"
+                    os.system(gzipcmd)
+            else:
+                print("Error Returned by mysql during the backup")
+                errors=True
+                # remove the file created by the backup process
+                if os.path.exists(path):
+                    os.remove(path)
         except:
             print("Error Generating a backup")
             errors = True
@@ -61,7 +72,7 @@ def backup_mysql_db(host, port, userName, password, databaseName, folderPath):
     if not errors:
         print ("")
         print ("Backup script completed")
-        print ("Your backups have been created in '" + path + "' directory")
+        print ("Your backup have been created.  It can found here: [" + path + "]")
     else:
         print("Backup Failed")
 
