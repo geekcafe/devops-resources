@@ -76,3 +76,5 @@ def backup_mysql_db(host, port, userName, password, databaseName, folderPath, co
     else:
         print("Backup Failed")
 
+def restore_mysql_db(host, port, userName, password, databaseName, folderPath, compress = True):
+    print(host)
