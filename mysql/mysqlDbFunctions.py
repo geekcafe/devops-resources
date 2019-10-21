@@ -4,8 +4,7 @@
 ###########################################################
 #
 # This python script is used for mysql database backup
-# using mysqldump and tar utility.
-#
+# using mysqldump and gzip utility.
 # Written by : Eric Wilson
 # Website: http://www.geekcafe.com
 # Created date: October 8, 2019
@@ -20,7 +19,7 @@ import datetime
 import pipes
 
 
-def backup_mysql_db(host, port, userName, password, databaseName, folderPath, compress = True):
+def backup_mysql_db(host, port, userName, password, databaseName, folderPath, compress = True, showProgress = True):
     
     # generate a backup name with a timestamp
     timestamp = time.strftime('%Y%m%d-%H%M%S')
@@ -45,8 +44,10 @@ def backup_mysql_db(host, port, userName, password, databaseName, folderPath, co
         try:        
             print("Backing up " + databaseName + " to " + path)
             # some options
+        
+            progress_options = " --verbose "
             dump_options = " --default-character-set=utf8 --skip-triggers  --single-transaction --skip-lock-tables  --compress "
-            dumpcmd = "mysqldump  --user=" + userName + " --host=" + host + " --protocol=tcp --port=" + port + " --password=" + password + dump_options + " " +databaseName + " > " + pipes.quote(path)
+            dumpcmd = "mysqldump  --user=" + userName + " --host=" + host + " --protocol=tcp --port=" + port + " --password=" + password + dump_options + " " + databaseName + " " + progress_options + "  > " + pipes.quote(path)
             
             
             print("Executing " + dumpcmd)
@@ -76,5 +77,98 @@ def backup_mysql_db(host, port, userName, password, databaseName, folderPath, co
     else:
         print("Backup Failed")
 
-def restore_mysql_db(host, port, userName, password, databaseName, folderPath, compress = True):
-    print(host)
+def restore_mysql_db(host, port, userName, password, databaseName, filePath, compress = True, showProgress = True):
+    errors = False
+
+    # check to see if the file exists
+    try:
+        print("checking directory path for " + filePath)
+        if not os.path.isfile(filePath) :
+            print("file does not exist")
+            errors = True 
+        
+    except:
+        print("Error checking for backup file")
+        errors = True
+
+    if not errors:
+        
+        connectCommand = "mysql  --user=" + userName + "  --host=" + host + "  --protocol=tcp --port=" + port + "  --password=" + password
+
+        try:
+            #drop the db 
+            print("\t[Database] [" + databaseName + "][Dropping]")
+            
+            
+            dropDbCommand = " -e \" drop database " + databaseName + "\""
+
+            response = os.system(connectCommand + dropDbCommand)
+
+            outcome = "NA"
+            if response==0:
+                outcome = "Succeeded"
+            else: 
+                outcome = "Failed"
+                #it's possible the database didn't exist so don't set the flag errors flag here
+
+            print("\t[Database][" + databaseName + "][Drop][" + outcome +"]")
+        except:
+            print("\tException Occured Dropping Db")
+
+        
+        try:
+            
+            print("\t[Database] [" + databaseName + "][Creating]")
+            
+            
+            dropDbCommand = " -e \" create database " + databaseName + "\""
+
+            response = os.system(connectCommand + dropDbCommand)
+
+            # create the db
+            outcome = "NA"
+            if response==0:
+                outcome = "Succeeded"
+            else: 
+                outcome = "Failed"                
+                # if we can't create it we should set the errors flag
+                outcome=True
+
+            print("\t[Database][" + databaseName + "][Create][" + outcome +"]")
+
+        except:
+            print("\tException Occured Creating Db")
+
+
+      
+
+
+        if not errors:
+            try:
+                
+                progressCmd = "pv " + filePath + " | "
+
+                restoreCmd =  connectCommand + "  " + databaseName
+
+                if showProgress:
+                    restoreCmd = progressCmd + " " + restoreCmd
+                else:
+                    restoreCmd = restoreCmd + "  < " + pipes.quote(filePath) 
+
+                # let's do a backup
+                response = os.system(restoreCmd)
+
+                if response!=0:
+                    errors = True
+
+            except:
+                print("\tException Occured")
+
+        
+        if not errors:
+            outocme = "Completed Successfully"
+        else: 
+            outocme = "Failed With Errors"                
+            
+
+        print("[Database][" + databaseName + "][Restore][" + outcome +"]")
